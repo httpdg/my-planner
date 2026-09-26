@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quant Trading Terminal Pro</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- TradingView Widget Script -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#07090e',
+                        cardBg: 'rgba(18, 24, 38, 0.75)',
+                        cardBorder: 'rgba(255, 255, 255, 0.08)',
+                        accentGreen: '#00e676',
+                        accentRed: '#ff1744',
+                        accentBlue: '#38bdf8',
+                        accentPurple: '#a855f7'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #07090e;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: #f3f4f6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .glass-panel {
+            background: rgba(18, 24, 38, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glow-green { box-shadow: 0 0 25px rgba(0, 230, 118, 0.3); }
+        .glow-red { box-shadow: 0 0 25px rgba(255, 23, 68, 0.3); }
+        .glow-purple { box-shadow: 0 0 30px rgba(168, 85, 247, 0.3); }
+        .pulse-animation { animation: pulse 1.8s infinite; }
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="p-3 max-w-md mx-auto min-h-screen flex flex-col justify-between pb-20">
+
+    <!-- Modal Subscription Required -->
+    <div id="sub-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full rounded-3xl p-6 text-center border border-accentBlue/30 shadow-2xl relative overflow-hidden">
+            <div class="w-14 h-14 bg-accentBlue/10 border border-accentBlue/40 rounded-2xl flex items-center justify-center mx-auto mb-3 text-accentBlue text-2xl">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h3 class="text-lg font-black tracking-wide text-white mb-1">ДОСТУП ОБМЕЖЕНО</h3>
+            <p class="text-xs text-gray-400 mb-5 leading-relaxed">Щоб отримувати точні AI-сигнали, необхідно бути підписаним на наш офіційний Telegram-канал.</p>
+            
+            <div class="space-y-3">
+                <button onclick="openChannel()" class="w-full py-3.5 rounded-xl font-extrabold text-black bg-accentBlue hover:brightness-110 active:scale-[0.98] transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="fa-brands fa-telegram text-base"></i> 1. Підписатися на канал
+                </button>
+                <button onclick="checkSubscription()" class="w-full py-3.5 rounded-xl font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 active:scale-[0.98] transition-all text-xs uppercase tracking-wider">
+                    2. Я підписався (Перевірити)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="flex justify-between items-center pb-3 border-b border-cardBorder">
+        <div class="flex items-center space-x-2.5">
+            <div class="w-2.5 h-2.5 rounded-full bg-accentGreen pulse-animation shadow-[0_0_10px_#00e676]"></div>
+            <span class="font-black text-base tracking-wider bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">QUANT TERMINAL</span>
+        </div>
+        <div class="glass-panel px-3 py-1 rounded-full text-[10px] font-mono text-gray-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-bolt text-accentGreen text-[9px]"></i>
+            <span>AI V3.4 LIVE</span>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="my-3 flex-1 flex flex-col">
+
+        <!-- TAB 1: SIGNALS -->
+        <div id="tab-signals" class="tab-content flex flex-col gap-4">
+            
+            <!-- Asset Selector (Horizontal Scroll Slider - 8 Pairs) -->
+            <section>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="text-[11px] text-gray-400 uppercase tracking-wider font-bold">Валютна пара</label>
+                    <span class="text-[10px] text-accentBlue font-mono">8 ПАР АКТИВНО</span>
+                </div>
+                
+                <div class="flex gap-2 overflow-x-auto hide-scroll pb-1">
+                    <button onclick="selectPair('EUR/JPY', 'FX:EURJPY', this)" class="asset-btn shrink-0 glass-panel border-2 border-accentBlue rounded-xl p-2.5 min-w-[105px] flex flex-col items-center justify-center transition-all">
+                        <span class="font-black text-xs text-white">EUR/JPY</span>
+                        <span class="text-[9px] text-accentGreen font-mono mt-0.5">▲ FOREX</span>
+                    </button>
+                    <button onclick="selectPair('BTC/USDT', 'BINANCE:BTCUSDT', this)" class="asset-btn shrink-0 glass-panel rounded-xl p-2.5 min-w-[105px] flex flex-col items-center justify-center transition-all opacity-60 hover:opacity-100">
+                        <span class="font-black text-xs text-white">BTC/USDT</span>
+                        <span class="text-[9px] text-accentBlue font-mono mt-0.5">⚡ CRYPTO</span>
+                    </button>
+                    <button onclick="selectPair('EUR/USD', 'FX:EURUSD', this)" class="asset-btn shrink-0 glass-panel rounded-xl p-2.5 min-w-[105px] flex flex-col items-center justify-center transition-all opacity-60 hover:opacity-100">
+                        <span class="font-black text-xs text-white">EUR/USD</span>
+                        <span class="text-[9px] text-accentGreen font-mono mt-0.5">▲ FOREX</span>
+                    </button>
+                    <button onclick="selectPair('GBP/USD', 'FX:GBPUSD', this)" class="asset-btn shrink-0 glass-panel rounded-xl p-2.5 min-w-[105px] flex flex-col items-center justify-center transition-all opacity-60 hover:opacity-100">
+                        <span class="font-black text-xs text-white">GBP/USD</span>
+                        <span class="text-[9px] text-accentGreen font-mono mt-0.5">▲ FOREX</span>
+                    </button>
+                    <button onclick="selectPair('USD/JPY', 'FX:USDJPY', this)" class="asset-btn shrink-0 glass-panel rounded-xl p-2.5 min-w-[105px] flex flex-col items-center justify-center transition-all opacity-60 hover:opacity-100">
+                        <span class="font-black text-xs text-white">USD/JPY</span>
+                        <span class="text-[9px] text-accentRed font-mono mt-0.5">▼ FOREX</span>
+                    </button>
+                    <button onclick="selectPair('AUD/USD', 'FX:AUDUSD', this)" class="asset-btn shrink-0 glass-panel rounded-xl p-2.5 min-w-[105px] flex flex-col items-center justify-center transition-all opacity-60 hover:opacity-100">
+                        <span class="font-black text-xs text-white">AUD/USD</span>
+                        <span class="text-[9px] text-accentGreen font-mono mt-0.5">▲ FOREX</span>
+                    </button>
+                    <button onclick="selectPair('ETH/USDT', 'BINANCE:ETHUSDT', this)" class="asset-btn shrink-0 glass-panel rounded-xl p-2.5 min-w-[105px] flex flex-col items-center justify-center transition-all opacity-60 hover:opacity-100">
+                        <span class="font-black text-xs text-white">ETH/USDT</span>
+                        <span class="text-[9px] text-accentBlue font-mono mt-0.5">⚡ CRYPTO</span>
+                    </button>
+                    <button onclick="selectPair('SOL/USDT', 'BINANCE:SOLUSDT', this)" class="asset-btn shrink-0 glass-panel rounded-xl p-2.5 min-w-[105px] flex flex-col items-center justify-center transition-all opacity-60 hover:opacity-100">
+                        <span class="font-black text-xs text-white">SOL/USDT</span>
+                        <span class="text-[9px] text-accentBlue font-mono mt-0.5">⚡ CRYPTO</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Timeframe Selector -->
+            <section>
+                <label class="text-[11px] text-gray-400 uppercase tracking-wider mb-1.5 block font-bold">Час експірації</label>
+                <div class="grid grid-cols-3 gap-1.5 glass-panel p-1.5 rounded-2xl">
+                    <button onclick="selectTF('1m', '1', this)" class="tf-btn bg-accentBlue text-black font-black text-xs py-2 rounded-xl transition-all shadow-md">1 МІН</button>
+                    <button onclick="selectTF('5m', '5', this)" class="tf-btn text-gray-400 font-bold text-xs py-2 rounded-xl transition-all hover:text-white">5 МІН</button>
+                    <button onclick="selectTF('10m', '15', this)" class="tf-btn text-gray-400 font-bold text-xs py-2 rounded-xl transition-all hover:text-white">10 МІН</button>
+                </div>
+            </section>
+
+            <!-- TradingView Real Chart -->
+            <section class="glass-panel rounded-2xl p-2.5 relative overflow-hidden">
+                <div class="flex justify-between items-center mb-2 px-1">
+                    <span class="text-[11px] font-bold text-gray-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-candlestick text-accentBlue"></i> TRADINGVIEW LIVE
+                    </span>
+                    <span class="text-[10px] font-mono text-accentGreen flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-accentGreen animate-ping"></span> REALTIME
+                    </span>
+                </div>
+                <div class="h-48 w-full rounded-xl overflow-hidden border border-white/5" id="tradingview_widget_container"></div>
+            </section>
+
+            <!-- Signal Box -->
+            <section id="signal-container" class="glass-panel rounded-2xl p-4 text-center relative overflow-hidden flex flex-col items-center justify-center min-h-[140px]">
+                <div id="signal-idle" class="flex flex-col items-center">
+                    <i class="fa-solid fa-microchip text-3xl text-gray-600 mb-2 animate-bounce"></i>
+                    <p class="text-gray-400 text-xs">Оберіть пару та натисніть «Отримати сигнал»</p>
+                </div>
+
+                <div id="signal-loader" class="hidden flex flex-col items-center py-2">
+                    <div class="w-9 h-9 border-3 border-accentBlue border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <p class="text-xs font-bold text-accentBlue tracking-widest uppercase">Аналіз ринку...</p>
+                    <span class="text-[10px] text-gray-500 mt-0.5" id="analysis-step">Сканування RSI & Order Blocks...</span>
+                </div>
+
+                <div id="signal-result" class="hidden w-full">
+                    <div class="flex justify-between items-center mb-2.5 text-[11px] text-gray-400 border-b border-white/5 pb-2">
+                        <span id="res-pair" class="font-extrabold text-white">EUR/JPY</span>
+                        <span id="res-tf" class="bg-white/10 px-2 py-0.5 rounded text-gray-200 font-mono">1m</span>
+                        <span id="res-winrate" class="text-accentGreen font-bold font-mono">PROBABILITY 88%</span>
+                    </div>
+
+                    <div id="direction-badge" class="py-3 rounded-xl flex items-center justify-center gap-3 mb-2.5 glow-green bg-accentGreen/10 border border-accentGreen text-accentGreen">
+                        <i id="direction-icon" class="fa-solid fa-arrow-trend-up text-2xl"></i>
+                        <div class="text-left">
+                            <div id="direction-text" class="text-xl font-black tracking-wider uppercase">ВГОРУ (CALL)</div>
+                            <div class="text-[10px] opacity-80">Прогнозується імпульс росту</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                        <div class="bg-black/30 p-2 rounded-xl border border-white/5">
+                            <span class="text-gray-500 block text-[9px]">ІНДИКАТОРИ</span>
+                            <span class="text-accentBlue font-bold text-[11px]">BULLISH CROSS</span>
+                        </div>
+                        <div class="bg-black/30 p-2 rounded-xl border border-white/5">
+                            <span class="text-gray-500 block text-[9px]">СИЛА СИГНАЛУ</span>
+                            <span id="res-power" class="text-accentGreen font-bold text-[11px]">ВИСОКА (9/10)</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Action Button -->
+            <button id="get-signal-btn" onclick="handleSignalClick()" class="w-full py-4 rounded-xl font-black text-black bg-gradient-to-r from-accentGreen to-emerald-400 hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-accentGreen/20 flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+                <i class="fa-solid fa-bolt"></i> Отримати сигнал
+            </button>
+        </div>
+
+        <!-- TAB 2: PLUS / VIP -->
+        <div id="tab-plus" class="tab-content hidden flex flex-col gap-4">
+            <div class="glass-panel border border-accentPurple/40 rounded-3xl p-6 glow-purple text-center relative overflow-hidden">
+                <div class="w-14 h-14 rounded-2xl bg-accentPurple/20 border border-accentPurple/50 flex items-center justify-center mx-auto mb-3 shadow-[0_0_15px_#a855f7]">
+                    <i class="fa-solid fa-crown text-accentPurple text-2xl"></i>
+                </div>
+                <h2 class="text-xl font-black text-white mb-1 tracking-wide">QUANT VIP CLUB</h2>
+                <p class="text-xs text-gray-400 mb-5">Приватно співтовариство з сигнальним ботом високої точності.</p>
+
+                <div class="space-y-2.5 text-left mb-6">
+                    <div class="flex items-center gap-3 bg-black/30 p-3 rounded-xl border border-white/5 text-xs">
+                        <i class="fa-solid fa-circle-check text-accentPurple"></i>
+                        <span>Прохідність сигналів до 93%</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-black/30 p-3 rounded-xl border border-white/5 text-xs">
+                        <i class="fa-solid fa-circle-check text-accentPurple"></i>
+                        <span>Smart Money & Liquidity Індикатор</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-black/30 p-3 rounded-xl border border-white/5 text-xs">
+                        <i class="fa-solid fa-circle-check text-accentPurple"></i>
+                        <span>Персональний менеджер і навчання</span>
+                    </div>
+                </div>
+
+                <button onclick="openTelegramLink('https://t.me/your_admin_username')" class="w-full py-4 rounded-xl font-black text-white bg-gradient-to-r from-accentPurple to-purple-600 hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-accentPurple/30 text-xs uppercase tracking-wider">
+                    <i class="fa-solid fa-gem mr-1.5"></i> Отримати VIP Доступ
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 3: TELEGRAM CHANNEL -->
+        <div id="tab-channel" class="tab-content hidden flex flex-col gap-4">
+            <div class="glass-panel rounded-3xl p-6 text-center flex flex-col items-center">
+                <div class="w-16 h-16 rounded-2xl bg-accentBlue/10 border border-accentBlue/40 flex items-center justify-center mb-3 text-accentBlue shadow-[0_0_15px_#38bdf8]">
+                    <i class="fa-paper-plane text-2xl"></i>
+                </div>
+                <h2 class="text-lg font-black text-white mb-1">Наш Telegram Канал</h2>
+                <p class="text-xs text-gray-400 mb-5 max-w-xs">Щоденна аналітика ринку, звіти по сигналах та безкоштовне навчання.</p>
+
+                <div class="w-full bg-black/40 rounded-2xl p-3.5 border border-white/5 mb-5 flex justify-around text-center font-mono">
+                    <div>
+                        <span class="block text-accentGreen font-bold text-base">88%+</span>
+                        <span class="text-[9px] text-gray-500 uppercase">Winrate</span>
+                    </div>
+                    <div class="border-r border-white/10"></div>
+                    <div>
+                        <span class="block text-accentBlue font-bold text-base">DAILY</span>
+                        <span class="text-[9px] text-gray-500 uppercase">Аналітика</span>
+                    </div>
+                </div>
+
+                <button onclick="openTelegramLink('https://t.me/your_channel_username')" class="w-full py-4 rounded-xl font-extrabold text-black bg-accentBlue hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-accentBlue/20 text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="fa-brands fa-telegram text-lg"></i> Перейти у Канал
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto glass-panel border-t border-white/10 px-4 py-2.5 flex justify-around z-40 rounded-t-2xl">
+        <button onclick="switchTab('signals', this)" class="nav-btn flex flex-col items-center gap-1 text-accentBlue">
+            <i class="fa-solid fa-chart-line text-lg"></i>
+            <span class="text-[10px] font-bold">Сигнали</span>
+        </button>
+        <button onclick="switchTab('plus', this)" class="nav-btn flex flex-col items-center gap-1 text-gray-500 hover:text-gray-300">
+            <i class="fa-solid fa-crown text-lg"></i>
+            <span class="text-[10px] font-bold">Плюс</span>
+        </button>
+        <button onclick="switchTab('channel', this)" class="nav-btn flex flex-col items-center gap-1 text-gray-500 hover:text-gray-300">
+            <i class="fa-paper-plane text-lg"></i>
+            <span class="text-[10px] font-bold">Канал</span>
+        </button>
+    </nav>
+
+    <script>
+        const tg = window.Telegram ? window.Telegram.WebApp : null;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // Subscription config
+        const CHANNEL_URL = "https://t.me/your_channel_username"; // Вкажіть юзернейм каналу
+        let isSubscribed = false;
+
+        let selectedPairName = 'EUR/JPY';
+        let selectedSymbol = 'FX:EURJPY';
+        let selectedTimeframe = '1m';
+        let tvInterval = '1';
+
+        function loadTradingViewWidget(symbol, interval) {
+            document.getElementById('tradingview_widget_container').innerHTML = '';
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": symbol,
+                "interval": interval,
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1",
+                "locale": "uk",
+                "toolbar_bg": "#07090e",
+                "enable_publishing": false,
+                "hide_top_toolbar": true,
+                "hide_legend": true,
+                "save_image": false,
+                "container_id": "tradingview_widget_container"
+            });
+        }
+
+        function switchTab(tabName, btn) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('text-accentBlue', 'text-accentPurple');
+                el.classList.add('text-gray-500');
+            });
+
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+            if (tabName === 'signals') {
+                btn.classList.add('text-accentBlue');
+            } else if (tabName === 'plus') {
+                btn.classList.add('text-accentPurple');
+            } else {
+                btn.classList.add('text-accentBlue');
+            }
+        }
+
+        function selectPair(name, symbol, btn) {
+            selectedPairName = name;
+            selectedSymbol = symbol;
+
+            document.querySelectorAll('.asset-btn').forEach(b => {
+                b.classList.remove('border-2', 'border-accentBlue', 'opacity-100');
+                b.classList.add('border', 'border-white/10', 'opacity-60');
+            });
+            btn.classList.remove('border-white/10', 'opacity-60');
+            btn.classList.add('border-2', 'border-accentBlue', 'opacity-100');
+
+            loadTradingViewWidget(selectedSymbol, tvInterval);
+        }
+
+        function selectTF(tf, interval, btn) {
+            selectedTimeframe = tf;
+            tvInterval = interval;
+
+            document.querySelectorAll('.tf-btn').forEach(b => {
+                b.classList.remove('bg-accentBlue', 'text-black', 'font-black');
+                b.classList.add('text-gray-400', 'font-bold');
+            });
+            btn.classList.add('bg-accentBlue', 'text-black', 'font-black');
+            btn.classList.remove('text-gray-400');
+
+            loadTradingViewWidget(selectedSymbol, tvInterval);
+        }
+
+        function handleSignalClick() {
+            if (!isSubscribed) {
+                document.getElementById('sub-modal').classList.remove('hidden');
+            } else {
+                generateSignal();
+            }
+        }
+
+        function openChannel() {
+            openTelegramLink(CHANNEL_URL);
+        }
+
+        function checkSubscription() {
+            // Фронтенд-емуляція перевірки (після кліку вважаємо підписаним)
+            isSubscribed = true;
+            document.getElementById('sub-modal').classList.add('hidden');
+            generateSignal();
+        }
+
+        function generateSignal() {
+            const btn = document.getElementById('get-signal-btn');
+            const idle = document.getElementById('signal-idle');
+            const loader = document.getElementById('signal-loader');
+            const result = document.getElementById('signal-result');
+            const stepText = document.getElementById('analysis-step');
+
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            idle.classList.add('hidden');
+            result.classList.add('hidden');
+            loader.classList.remove('hidden');
+
+            const steps = [
+                'Сканування індикаторів TradingView...',
+                'Визначення Order Blocks та Ліквідності...',
+                'Аналіз імпульсу за ЕМА 200...',
+                'Фіналізація сигналу...'
+            ];
+
+            let stepIdx = 0;
+            const interval = setInterval(() => {
+                stepIdx++;
+                if (stepIdx < steps.length) {
+                    stepText.innerText = steps[stepIdx];
+                }
+            }, 350);
+
+            setTimeout(() => {
+                clearInterval(interval);
+                loader.classList.add('hidden');
+                result.classList.remove('hidden');
+
+                const isCall = Math.random() > 0.48;
+                const winrate = Math.floor(Math.random() * 9) + 84;
+                const powerVal = (Math.random() * 1.8 + 8.2).toFixed(1);
+
+                document.getElementById('res-pair').innerText = selectedPairName;
+                document.getElementById('res-tf').innerText = selectedTimeframe;
+                document.getElementById('res-winrate').innerText = `PROBABILITY ${winrate}%`;
+                document.getElementById('res-power').innerText = `ВИСОКА (${powerVal}/10)`;
+
+                const badge = document.getElementById('direction-badge');
+                const dirIcon = document.getElementById('direction-icon');
+                const dirText = document.getElementById('direction-text');
+
+                if (isCall) {
+                    badge.className = "py-3 rounded-xl flex items-center justify-center gap-3 mb-2.5 glow-green bg-accentGreen/10 border border-accentGreen text-accentGreen";
+                    dirIcon.className = "fa-solid fa-arrow-trend-up text-2xl";
+                    dirText.innerText = "ВГОРУ (CALL)";
+                } else {
+                    badge.className = "py-3 rounded-xl flex items-center justify-center gap-3 mb-2.5 glow-red bg-accentRed/10 border border-accentRed text-accentRed";
+                    dirIcon.className = "fa-solid fa-arrow-trend-down text-2xl";
+                    dirText.innerText = "ВНИЗ (PUT)";
+                }
+
+                if (tg && tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }, 1600);
+        }
+
+        function openTelegramLink(url) {
+            if (tg && tg.openTelegramLink) {
+                tg.openTelegramLink(url);
+            } else {
+                window.open(url, '_blank');
+            }
+        }
+
+        window.onload = () => {
+            loadTradingViewWidget(selectedSymbol, tvInterval);
+        };
+    </script>
+</body>
+</html>
